@@ -3,6 +3,7 @@
 #include "heat_control.h"
 #include "communication.h"
 
+SemaphoreHandle_t ADC_mutex;
 
 void setup() {
     //motor_control_init(1.0f);

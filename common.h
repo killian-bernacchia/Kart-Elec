@@ -35,18 +35,18 @@
 
 typedef float percent_t;
 
-typedef struct {
+typedef struct ADC_Data{
     uint16_t raw;
     float voltage;
 } ADC_Data;
 
-typedef struct {
+typedef struct Heat_Data{
     ADC_Data raw;
     percent_t ratio;
     float temperature;
 } Heat_Data;
 
-typedef struct {
+typedef struct Speed_Data{
     ADC_Data raw;
     percent_t ratio;
     percent_t final_ratio;
@@ -73,6 +73,6 @@ extern QueueHandle_t heat_ctrl_2_communication_queue; // heat_control_tsk => com
 /********************************
  * Semaphores
  */
-extern SemaphoreHandle_t adc_mutex;
+extern SemaphoreHandle_t ADC_mutex;
 
 #endif // COMMON_H

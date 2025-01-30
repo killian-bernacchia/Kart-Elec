@@ -18,8 +18,8 @@
  * Functions prototype
  */
 
-void motor_control_init(percent_t max_speed_rate);
-void motor_control_set_max_speed_rate(percent_t max_speed_rate);
+void motor_control_init(percent_t speed_limite_ratio);
+void motor_control_set_speed_limite_ratio(percent_t speed_limite_ratio);
 void motor_control_reset();
 
 //send the speed to the motor
