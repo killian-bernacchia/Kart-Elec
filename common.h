@@ -57,7 +57,7 @@ typedef struct Speed_Data{
  */
 
 extern TaskHandle_t heat_control_tsk_hndl; // get the temperature
-extern TaskHandle_t speed_command_tsk_hndl; // get the speed
+extern TaskHandle_t user_speed_command_tsk_hndl; // get the speed
 extern TaskHandle_t motor_control_tsk_hndl; // send the speed
 extern TaskHandle_t communication_tsk_hndl; // send the data
 extern TaskHandle_t motor_speed_mode_tsk_hndl; // change motor mode

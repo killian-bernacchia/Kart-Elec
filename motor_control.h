@@ -26,7 +26,7 @@ void motor_control_reset();
 void motor_control_task(void *pvParameters);
 
 //get the speed from the user, scale it to a ratio and send it to motor_control_task
-void speed_command_task(void *pvParameters);
+void user_speed_command_task(void *pvParameters);
 
 
 #endif // MOTOR_CONTROL_H
