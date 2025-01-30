@@ -1,0 +1,4 @@
+#if !defined(COMMUNICATION_H)
+#define COMMUNICATION_H
+
+#endif // COMMUNICATION_H
