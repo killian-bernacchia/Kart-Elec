@@ -41,13 +41,13 @@ typedef struct ADC_Data{
 } ADC_Data;
 
 typedef struct Heat_Data{
-    ADC_Data raw;
+    ADC_Data adc;
     percent_t ratio;
     float temperature;
 } Heat_Data;
 
 typedef struct Speed_Data{
-    ADC_Data raw;
+    ADC_Data adc;
     percent_t ratio;
     percent_t final_ratio;
 } Speed_Data;
