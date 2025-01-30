@@ -8,6 +8,9 @@ Filter _speed_filter;
 uint16_t _speed_samples[SAMPLES_SIZE];
 percent_t _speed_limite_ratio;
 
+QueueHandle_t user_speed_cmd_2_motor_ctrl_queue; // speed_command_tsk => motor_control_tsk
+QueueHandle_t user_speed_cmd_2_communication_queue; // speed_command_tsk => communication_tsk
+
 void motor_control_init(percent_t speed_limite_ratio)
 {
     _speed_limite_ratio = speed_limite_ratio;
@@ -21,6 +24,9 @@ void motor_control_init(percent_t speed_limite_ratio)
         xSemaphoreGive(ADC_mutex);
         FilterPush(&_speed_filter, VIN);
     }
+
+    user_speed_cmd_2_motor_ctrl_queue = xQueueCreate(1, sizeof(Speed_Data));
+    user_speed_cmd_2_communication_queue = xQueueCreate(1, sizeof(Speed_Data));
 }
 
 void motor_control_set_speed_limite_ratio(percent_t speed_limite_ratio)
