@@ -65,9 +65,9 @@ extern TaskHandle_t motor_speed_mode_tsk_hndl; // change motor mode
 /********************************
  * Queues
  */
-extern QueueHandle_t speed_cmd_2_motor_ctrl_queue; // speed_command_tsk => motor_control_tsk
+extern QueueHandle_t user_speed_cmd_2_motor_ctrl_queue; // speed_command_tsk => motor_control_tsk
 extern QueueHandle_t heat_ctrl_2_motor_ctrl_queue; // heat_control_tsk => motor_control_tsk
-extern QueueHandle_t speed_cmd_2_communication_queue; // speed_command_tsk => communication_tsk
+extern QueueHandle_t user_speed_cmd_2_communication_queue; // speed_command_tsk => communication_tsk
 extern QueueHandle_t heat_ctrl_2_communication_queue; // heat_control_tsk => communication_tsk
 
 /********************************
