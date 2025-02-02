@@ -28,10 +28,10 @@ uint16_t FilterMean(Filter *filter);
 float FilterMeanFloat(Filter *filter);
 
 //exclude values to far from the mean in the range allowed
-uint16_t FilterDoubledMean(Filter *filter, percent_t error);
+uint16_t FilterDoubledMean(Filter *filter, float factor);
 
 //exclude values to far from the mean in the range allowed
-float FilterDoubledMeanFloat(Filter *filter, percent_t error);
+float FilterDoubledMeanFloat(Filter *filter, float factor);
 
 float FilterStandardDeviation(Filter *filter);
 
