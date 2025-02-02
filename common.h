@@ -19,6 +19,7 @@
 
 #define ADC_RESOLUTION 12
 #define ADC_MAX_VALUE ((1 << ADC_RESOLUTION) - 1)
+#define ADC_VOLTAGE 5.0f
 
 #define ADC_MOTOR_PIN 25
 #define ADC_PEDAL_PIN 34
@@ -37,6 +38,7 @@ typedef float percent_t;
 
 typedef struct ADC_Data{
     uint16_t raw;
+    float filtered;
     float voltage;
 } ADC_Data;
 
