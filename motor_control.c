@@ -5,7 +5,7 @@
 #define SAMPLES_SIZE 10
 #define PEDAL_CORRECTION_FACTOR 1.4f
 
-void ErrorNoSignal(Speed_Data speed_data, int no_signal_count);
+void ErrorNoSignal(Speed_Data speed_data);
 
 Filter _speed_filter;
 uint16_t _speed_samples[SAMPLES_SIZE]; 
@@ -51,7 +51,6 @@ void user_speed_command_task(void *pvParameters)
     uint16_t VIN;
     float speed;
     percent_t ratio;
-    int no_signal_count = 0;
 
     while(1)
     {
@@ -66,17 +65,17 @@ void user_speed_command_task(void *pvParameters)
 
         if ( VIN < SPEED_NO_SIGNAL )
         {
-            no_signal_count++;
+            speed_Data.adc.no_signal_count++;
         }
         else
         {
-            no_signal_count--;
-            no_signal_count = ( no_signal_count < 0 ) ? 0 : no_signal_count;
+            if ( speed_Data.adc.no_signal_count > 0)
+              speed_Data.adc.no_signal_count--;
         }
 
-        if( no_signal_count > SAMPLES_SIZE )
+        if( speed_Data.adc.no_signal_count > SAMPLES_SIZE )
         {
-            ErrorNoSignal(speed_Data, no_signal_count);
+            ErrorNoSignal(speed_Data);
             vTaskDelay(1 / portTICK_PERIOD_MS);
         }
         else
@@ -94,15 +93,14 @@ void user_speed_command_task(void *pvParameters)
             }
             xQueueOverwrite(user_speed_cmd_2_motor_ctrl_queue, &speed_Data);
         }
-
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(5 / portTICK_PERIOD_MS);
     }
 }
 
-void ErrorNoSignal(Speed_Data speed_data, int no_signal_count)
+void ErrorNoSignal(Speed_Data speed_data)
 {
     motor_is_unsafe = true;
-    if ( no_signal_count < 2*SAMPLES_SIZE )
+    if ( speed_data.adc.no_signal_count < 2*SAMPLES_SIZE )
         dacWrite(ADC_MOTOR_PIN, SPEED_SLEEP_SIGNAL);
     else
         dacWrite(ADC_MOTOR_PIN, 0);

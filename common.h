@@ -42,6 +42,7 @@ typedef struct ADC_Data{
     uint16_t raw;
     float filtered;
     float voltage;
+    int no_signal_count;
 } ADC_Data;
 
 typedef struct Heat_Data{
