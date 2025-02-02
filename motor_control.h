@@ -10,9 +10,9 @@
  * Defines
  */
 
-#define MAX_SPEED 255
-#define SLEEP_SPEED 80 // minimum speed before the motor starts (real value is 100 but we keep a margin)
-#define MIN_SPEED 35 // lesser speeds are seen as 'no signals'
+#define SPEED_MAX_SIGNAL (255<<4)
+#define SPEED_SLEEP_SIGNAL (80<<4) // minimum speed before the motor starts (real value is 100 but we keep a margin)
+#define SPEED_NO_SIGNAL (35<<4) // lesser speeds are seen as 'no signals'
 
 /********************************
  * Functions prototype
