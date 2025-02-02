@@ -20,6 +20,8 @@
 #define ADC_RESOLUTION 12
 #define ADC_MAX_VALUE ((1 << ADC_RESOLUTION) - 1)
 #define ADC_VOLTAGE 5.0f
+#define DAC_RESOLUTION 8
+#define DAC_MAX_VALUE ((1 << DAC_RESOLUTION) - 1)
 
 #define ADC_MOTOR_PIN 25
 #define ADC_PEDAL_PIN 34
