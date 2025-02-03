@@ -14,7 +14,7 @@
 #define MAX_SAFE_TEMPERATURE 85.0f   // °C
 #define START_SAFE_TEMPERATURE 70.0f //
 
-#define MINIMUM_SPEED_RATIO 0.1f
+#define MINIMAL_SAFE_RATIO 0.1f
 
 /********************************
  * Functions prototype
