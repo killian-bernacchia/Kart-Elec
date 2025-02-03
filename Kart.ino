@@ -11,6 +11,8 @@ TaskHandle_t motor_control_tsk_hndl; // send the speed
 //TaskHandle_t communication_tsk_hndl; // send the data
 //TaskHandle_t motor_speed_mode_tsk_hndl; // change motor mode
 
+LiquidCrystal_I2C lcd(0x27, 20, 4); // Adresse I2C, colonnes, lignes
+
 void setup() {
 
     Serial.begin(115200);
@@ -20,11 +22,11 @@ void setup() {
     dacWrite(ADC_MOTOR_PIN, SPEED_SLEEP_SIGNAL);     //repos = 0? ou 800mv? // 62 = environ 800mV
 
     //------------Init Lcd-----------/
-    //lcd.init();
-    //lcd.init();
-    //lcd.backlight();
-    //lcd.setCursor(6, 0);
-    //lcd.print("eKart");
+    lcd.init();
+    lcd.init();
+    lcd.backlight();
+    lcd.setCursor(6, 0);
+    lcd.print("eKart");
 
     ADC_mutex = xSemaphoreCreateMutex();
     motor_control_init(1.0f);
