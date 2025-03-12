@@ -66,7 +66,7 @@ void motor_control_task(void *pvParameters)
             speed_data.speed = DAC_MAX_VALUE;
         if ( speed_data.speed < 0 )
             speed_data.speed = 0;
-        dacWrite(ADC_MOTOR_PIN, speed_data.speed);
+        //dacWrite(ADC_MOTOR_PIN, speed_data.speed);
         
         xQueueOverwrite(motor_ctrl_queue_cmd_2_communication_queue, &speed_data);
 
@@ -85,14 +85,14 @@ void user_speed_command_task(void *pvParameters)
     while(1)
     {
         xSemaphoreTake(ADC_mutex, portMAX_DELAY);
-        VIN = analogRead(ADC_PEDAL_PIN);
+        VIN = 600;//analogRead(ADC_PEDAL_PIN);
         xSemaphoreGive(ADC_mutex);
 
         speed_data.adc.raw = VIN;
         speed_data.adc.voltage = (VIN*ADC_VOLTAGE)/ADC_MAX_VALUE;
         FilterPush(&_speed_filter, VIN);
-        speed_data.adc.filtered = FilterDoubledMeanFloat(&_speed_filter, 1.2f);
-
+        //speed_data.adc.filtered = FilterDoubledMeanFloat(&_speed_filter, 1.2f);
+        //Serial.printf("VIN %i, SPNS %i, nsc %i\n",VIN, SPEED_NO_SIGNAL,speed_data.adc.no_signal_count);
         if ( VIN < SPEED_NO_SIGNAL )
         {
             speed_data.adc.no_signal_count++;
@@ -110,6 +110,8 @@ void user_speed_command_task(void *pvParameters)
         }
         else
         {
+            speed_data.adc.filtered = 18.0f;//FilterDoubledMeanFloat(&_speed_filter, 1.2f);
+            Serial.printf("filt %f",speed_data.adc.filtered);
             speed = PEDAL_CORRECTION_FACTOR * speed_data.adc.filtered;
             if ( speed > SPEED_SLEEP_SIGNAL)
             {
@@ -129,9 +131,13 @@ void user_speed_command_task(void *pvParameters)
 
 static void ErrorNoSignal(Speed_Data speed_data)
 {
+    Serial.print("no signal :");
+    Serial.print(speed_data.adc.raw);
+    Serial.print(" < ");
+    Serial.println(SPEED_NO_SIGNAL);
     motor_is_unsafe = true;
-    if ( speed_data.adc.no_signal_count < 2*SAMPLES_SIZE )
-        dacWrite(ADC_MOTOR_PIN, SPEED_SLEEP_SIGNAL);
-    else
-        dacWrite(ADC_MOTOR_PIN, 0);
+    //if ( speed_data.adc.no_signal_count < 2*SAMPLES_SIZE )
+        //dacWrite(ADC_MOTOR_PIN, SPEED_SLEEP_SIGNAL);
+    //else
+        //dacWrite(ADC_MOTOR_PIN, 0);
 }

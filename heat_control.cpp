@@ -128,14 +128,14 @@ void heat_control_task(void *pvParameters)
 static void ErrorNoSignal(Heat_Data heat_data)
 {
     motor_is_unsafe = true;
-    if ( heat_data.adc.no_signal_count < 2*SAMPLES_SIZE )
-        dacWrite(ADC_MOTOR_PIN, SPEED_SLEEP_SIGNAL);
-    else
-        dacWrite(ADC_MOTOR_PIN, 0);
+    //if ( heat_data.adc.no_signal_count < 2*SAMPLES_SIZE )
+        //dacWrite(ADC_MOTOR_PIN, SPEED_SLEEP_SIGNAL);
+    //else
+        //dacWrite(ADC_MOTOR_PIN, 0);
 }
 
 void ErrorOverheat(Heat_Data heat_data)
 {
     motor_is_unsafe = true;
-    dacWrite(ADC_MOTOR_PIN, SPEED_SLEEP_SIGNAL);
+    //dacWrite(ADC_MOTOR_PIN, SPEED_SLEEP_SIGNAL);
 }

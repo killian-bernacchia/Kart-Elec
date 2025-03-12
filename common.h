@@ -23,8 +23,8 @@
 #define DAC_RESOLUTION 8
 #define DAC_MAX_VALUE ((1 << DAC_RESOLUTION) - 1)
 
-#define ADC_MOTOR_PIN 25
-#define ADC_PEDAL_PIN 34
+#define ADC_MOTOR_PIN 14//25
+#define ADC_PEDAL_PIN 2//34
 #define ADC_HEAT_PIN 15
 
 #define SPEED_MAX_SIGNAL (255<<4)
