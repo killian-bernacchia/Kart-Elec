@@ -1,0 +1,15 @@
+Test de comparaison de filtres numérique, les tests ont été réalisés sans le moteur, donc avec peu d'interférences.
+
+Vin est la valeur récupéré par l'adc
+Ensuite sur cette valeur est appliqué deux filtres
+
+- Une moyenne glissante de 10 valeurs,
+
+- Et un filtre plus complexe impliquant une médiane, suivit d'une moyenne des valeurs centrales, puis d'un lissage (une addition de la valeur précédente et de la nouvelle avec des coefficients appliqués, ei : 0.6*old + 0.4*new)
+ N indique le nombre de valeurs dans le filtre et M le nombre de valeurs gardés pour la moyenne
+
+Les valeurs sont transmises par liaison Série toute les 500ms.
+L'écart de temps est important il serait plus intéressant qu'il soit plus court, 
+mais nous avons le problème qu'Arduino IDE peut planter avec un écran bleu si le Sérial communique trop de données.
+
+Pour mesuré la stabilité du signal nous observons également les changements de valeurs (représentés avec les pointillés)
