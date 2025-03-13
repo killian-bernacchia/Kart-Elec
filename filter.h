@@ -1,38 +1,28 @@
 #if !defined(FILTER_H)
 #define FILTER_H
 
-#include "common.h"
-#include "stdint.h"
+#include <stdint.h>
 
-typedef struct Filter
-{
+typedef uint16_t adc_sample_t;
+
+typedef struct Filter_bis {
     int size;
-    uint16_t *samples;
-    uint32_t sum;
-    float mean;
-    int wrap_index; // index of the oldest sample, instead of shifting all the samples we wrap around the array
-} Filter;
+    int window_size;
+    int last_id;
+    float trimed_mean;
+    float trimed_filtered_mean;
+    uint16_t* samples;
+    uint16_t* samples_sorted;
+} Filter_bis;
 
-void FilterInit(Filter *filter, uint16_t *array, int size);
+void Filter_init(Filter_bis *filter, int size, int window_size, uint16_t *array1, uint16_t *array2, uint16_t initial_value);
+uint16_t Filter_push(Filter_bis *filter, uint16_t value);
 
-void FilterSetAll(Filter *filter, uint16_t value);
+uint16_t Filter_getMedian(Filter_bis *filter);
+float Filter_getTrimedMean(Filter_bis *filter);
+float Filter_getTrimedFilteredMean(Filter_bis *filter);
 
-uint16_t FilterGetOldest(Filter *filter);
+void printSamplesSorted(Filter_bis *filter);
+void printSamples(Filter_bis *filter);
 
-uint16_t FilterGetNewest(Filter *filter);
-
-uint16_t FilterPush(Filter *filter, uint16_t sample);
-
-uint16_t FilterMean(Filter *filter);
-
-float FilterMeanFloat(Filter *filter);
-
-//exclude values to far from the mean in the range allowed
-uint16_t FilterDoubledMean(Filter *filter, float factor);
-
-//exclude values to far from the mean in the range allowed
-float FilterDoubledMeanFloat(Filter *filter, float factor);
-
-float FilterStandardDeviation(Filter *filter);
-
-#endif // FILTER_H
+#endif //FILTER_H

@@ -1,137 +1,130 @@
 #include "filter.h"
-#include "math.h"
 
-#define MAX_DOUBLE_MEAN_TRIES 3
+#include <stdlib.h>
+#include <string.h>
 
-void FilterInit(Filter *filter, uint16_t *array, int size)
-{
+static int uint16_compare(const void *a, const void *b);
+
+void Filter_init(Filter_bis *filter, int size, int window_size, adc_sample_t *array1, adc_sample_t *array2, adc_sample_t initial_value){
     filter->size = size;
-    filter->samples = array;
-    filter->sum = 0;
-    filter->mean = 0;
-    filter->wrap_index = 0;
+    filter->window_size = window_size;
+    filter->last_id = size - 1;
+    filter->trimed_mean = initial_value;
+    filter->trimed_filtered_mean = initial_value;
+    filter->samples = array1;
+    filter->samples_sorted = array2;
+
     for (int i = 0; i < size; i++) {
-        filter->samples[i] = 0;
+        array1[i] = initial_value;
+        array2[i] = initial_value;
     }
 }
 
-void FilterSetAll(Filter *filter, uint16_t value)
-{
-    for (int i = 0; i < filter->size; i++) {
-        filter->samples[i] = value;
+adc_sample_t Filter_push(Filter_bis *filter, adc_sample_t value) {
+    int size = filter->size;
+    int window_size = filter->window_size;
+    int current_id = (filter->last_id + 1)%size;
+    adc_sample_t *samples = filter->samples;
+    adc_sample_t *samples_sorted = filter->samples_sorted;
+    adc_sample_t old_value = samples[current_id];
+
+    filter->samples[current_id] = value;
+    filter->last_id = current_id;
+
+    // Search old value index in sorted array
+    int old_id = 0;
+    for (int i = size-1; i >= 0; i--) {
+        if (samples_sorted[i] == old_value) {
+            old_id = i;
+            break;
+        }
     }
-    filter->mean = value;
-    filter->sum = value * filter->size;
-}
 
-uint16_t FilterGetOldest(Filter *filter)
-{
-    return filter->samples[filter->wrap_index];
-}
+    //Check if sorting and calculating the mean is avoidable
+    if(value != old_value) {
 
-uint16_t FilterGetNewest(Filter *filter)
-{
-    int index = (filter->size + filter->wrap_index - 1) % filter->size;
-    return filter->samples[index];
-}
+        // Check if sorting is avoidable
+        if(value <= samples_sorted[0]) {
+            memmove(samples_sorted+1, samples_sorted, old_id*sizeof(adc_sample_t));
+            samples_sorted[0] = value;
+        }
+        else if(value >= samples_sorted[size-1]) {
+            memmove(samples_sorted+old_id, samples_sorted+old_id+1, (size-old_id-1)*sizeof(adc_sample_t));
+            samples_sorted[size-1] = value;
+        }
+        else {
+            int old_id = 0;
+            for(int i = size - 1; i >= 0; i--) { // Checking from the end because it's more likely to get high values
+                if(samples_sorted[i] == old_value) {
+                    old_id = i;
+                    break;
+                }
+            }
 
-uint16_t FilterPush(Filter *filter, uint16_t sample)
-{
-    uint16_t oldest = filter->samples[filter->wrap_index];
-    filter->sum -= oldest;
-    filter->samples[filter->wrap_index] = sample;
-    filter->sum += sample;
-    filter->mean = filter->sum / (float)filter->size;
-    filter->wrap_index = (filter->wrap_index + 1) % filter->size;
-    return oldest;
-}
+            int left_id = 0;
+            for(int i = size - 1; i >= 0; i--) {
+                if(samples_sorted[i] <= value) {
+                    left_id = i;
+                    break;
+                }
+            }
 
-uint16_t FilterMean(Filter *filter)
-{
-    return filter->sum / filter->size;
-}
-
-float FilterMeanFloat(Filter *filter)
-{
-    return filter->mean;
-}
-
-//exclude values out of the standard deviation multiplied by a factor 
-uint16_t FilterDoubledMean(Filter *filter, float factor)
-{
-    float deviation = FilterStandardDeviation(filter);
-    int validated_values = 0;
-    uint32_t sum = 0;
-    uint16_t doubled_mean = 0;
-
-    // we want at least 1/3 of the values to be validated
-    safe_while(validated_values < (filter->size / 3 + 1), MAX_DOUBLE_MEAN_TRIES)
-    {
-        validated_values = 0;
-        uint16_t min = filter->mean - factor * deviation;
-        uint16_t max = filter->mean + factor * deviation;
-        sum = 0;
-        for (int i = 0; i < filter->size; i++)
-        {
-            if (filter->samples[i] >= min && filter->samples[i] <= max)
-            {
-                sum += filter->samples[i];
-                validated_values++;
+            if(old_id <= left_id) {
+                memmove(samples_sorted+old_id, samples_sorted+old_id+1, (left_id-old_id)*sizeof(adc_sample_t));
+                samples_sorted[left_id] = value;
+            }
+            else if(old_id > left_id) {
+                memmove(samples_sorted+left_id+1, samples_sorted+left_id, (old_id-left_id)*sizeof(adc_sample_t));
+                samples_sorted[left_id+1] = value;
             }
         }
-        factor *= 1.5f;
-    }
 
-    if( validated_values > (filter->size / 3 + 1) )
-        doubled_mean = sum / validated_values;
-    else
-        doubled_mean = filter->mean;
-
-    return doubled_mean;
-}
-
-//exclude values out of the standard deviation multiplied by a factor 
-float FilterDoubledMeanFloat(Filter *filter, float factor)
-{
-    float deviation = FilterStandardDeviation(filter);
-    int validated_values = 0;
-    double sum = 0.0f;
-    float doubled_mean = 0.0f;
-
-    // we want at least 1/3 of the values to be validated
-    safe_while(validated_values < (filter->size / 3 + 1), MAX_DOUBLE_MEAN_TRIES)
-    {
-        validated_values = 0;
-        float min = filter->mean - factor * deviation;
-        float max = filter->mean + factor * deviation;
-        sum = 0.0f;
-        for (int i = 0; i < filter->size; i++)
+        // Calculate the mean
+        if(window_size >= size)
         {
-            if (filter->samples[i] >= min && filter->samples[i] <= max)
+            uint32_t sum = 0;
+            for(int i = 0; i < size; i++)
             {
-                sum += filter->samples[i];
-                validated_values++;
+                sum += samples_sorted[i];
             }
+            filter->trimed_mean = sum/(float)window_size;
         }
-        factor *= 1.5f;
+        else if(window_size <= 1)
+        {
+            filter->trimed_mean = samples_sorted[size/2];
+        }
+        else
+        {
+            int end = size/2 + window_size/2;
+            int start = end - window_size + 1;
+            adc_sample_t sum = 0;
+            for(int i = start; i <= end; i++)
+            {
+                sum += samples_sorted[i];
+            }
+            filter->trimed_mean = sum/(float)window_size;
+        }
     }
 
-    if( validated_values > (filter->size / 3 + 1) )
-        doubled_mean = sum / validated_values;
-    else
-        doubled_mean = filter->mean;
+    filter->trimed_filtered_mean = 0.6f*filter->trimed_filtered_mean + 0.4f*filter->trimed_mean;
 
-    return doubled_mean;
+    return old_value;
 }
 
-float FilterStandardDeviation(Filter *filter)
-{
-    double sum = 0.0f;
-    for (int i = 0; i < filter->size; i++) {
-        float diff = filter->samples[i] - filter->mean;
-        diff *= diff;
-        sum += diff;
-    }
-    return sqrtf( sum / (filter->size - 1) );
+uint16_t Filter_getMedian(Filter_bis *filter) {
+    return filter->samples_sorted[filter->size / 2];
 }
 
+float Filter_getTrimedMean(Filter_bis *filter) {
+    return filter->trimed_mean;
+}
+
+float Filter_getTrimedFilteredMean(Filter_bis *filter) {
+    return filter->trimed_filtered_mean;
+}
+
+int uint16_compare(const void *a, const void *b) {
+    uint16_t val_a = *(const uint16_t*)a;
+    uint16_t val_b = *(const uint16_t*)b;
+    return (val_a > val_b) - (val_a < val_b);
+}
