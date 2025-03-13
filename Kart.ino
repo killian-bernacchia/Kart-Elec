@@ -8,7 +8,7 @@
 
 uint16_t samples[SAMPLES_SIZE];
 uint16_t samples_sorted[SAMPLES_SIZE];
-Filter_bis filter_speed;
+Filter filter_speed;
 
 #define MOTOR_PIN 25
 #define PEDAL_PIN 34

@@ -5,7 +5,7 @@
 
 static int uint16_compare(const void *a, const void *b);
 
-void Filter_init(Filter_bis *filter, int size, int window_size, adc_sample_t *array1, adc_sample_t *array2, adc_sample_t initial_value){
+void Filter_init(Filter *filter, int size, int window_size, adc_sample_t *array1, adc_sample_t *array2, adc_sample_t initial_value){
     filter->size = size;
     filter->window_size = window_size;
     filter->last_id = size - 1;
@@ -20,7 +20,7 @@ void Filter_init(Filter_bis *filter, int size, int window_size, adc_sample_t *ar
     }
 }
 
-adc_sample_t Filter_push(Filter_bis *filter, adc_sample_t value) {
+adc_sample_t Filter_push(Filter *filter, adc_sample_t value) {
     int size = filter->size;
     int window_size = filter->window_size;
     int current_id = (filter->last_id + 1)%size;
@@ -111,15 +111,15 @@ adc_sample_t Filter_push(Filter_bis *filter, adc_sample_t value) {
     return old_value;
 }
 
-uint16_t Filter_getMedian(Filter_bis *filter) {
+uint16_t Filter_getMedian(Filter *filter) {
     return filter->samples_sorted[filter->size / 2];
 }
 
-float Filter_getTrimedMean(Filter_bis *filter) {
+float Filter_getTrimedMean(Filter *filter) {
     return filter->trimed_mean;
 }
 
-float Filter_getTrimedFilteredMean(Filter_bis *filter) {
+float Filter_getTrimedFilteredMean(Filter *filter) {
     return filter->trimed_filtered_mean;
 }
 
