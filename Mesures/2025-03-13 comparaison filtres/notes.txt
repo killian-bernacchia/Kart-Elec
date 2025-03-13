@@ -13,3 +13,7 @@ L'écart de temps est important il serait plus intéressant qu'il soit plus cour
 mais nous avons le problème qu'Arduino IDE peut planter avec un écran bleu si le Sérial communique trop de données.
 
 Pour mesuré la stabilité du signal nous observons également les changements de valeurs (représentés avec les pointillés)
+
+Remarques :
+- La valeur minimal de la pédale constaté est autour de 850 
+- La valeur minimal de la pédale constaté est autour de 2900
