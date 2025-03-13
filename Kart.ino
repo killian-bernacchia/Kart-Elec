@@ -1,6 +1,17 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
+#include "filter.h"
+
+#define SAMPLES_SIZE 7
+#define WINDOW_SIZE 3
+
+uint16_t samples[SAMPLES_SIZE];
+uint16_t samples_sorted[SAMPLES_SIZE];
+Filter_bis filter;
+
+int count = 0;
+
 #define MOTOR_PIN 25
 #define PEDAL_PIN 34
 #define TEMP_PIN 15
@@ -26,8 +37,18 @@
 static QueueHandle_t speedQueue;
 static QueueHandle_t tempQueue;
 
-volatile uint8_t feedBack_speed;    // writed by getTemp_Task, readed by feedBack_Task
+volatile uint16_t feedBack_speed;    // writed by getTemp_Task, readed by feedBack_Task
+volatile uint16_t feedBack_speed_1;    // writed by getTemp_Task, readed by feedBack_Task
+volatile uint16_t feedBack_speed_2;    // writed by getTemp_Task, readed by feedBack_Task
 volatile int feedBack_temperature;  // writed by getTemp_Task, readed by feedBack_Task
+
+volatile int cnt;
+volatile int cnt1;
+volatile int cnt2;
+
+volatile long int cnt1_bis;
+volatile long int cnt2_bis;
+
 
 SemaphoreHandle_t ADC_mutex;
 TaskHandle_t getTemp_TaskHandle;
@@ -42,6 +63,9 @@ void setup() {
   speedQueue = xQueueCreate(1, sizeof(uint8_t));
   tempQueue = xQueueCreate(1, sizeof(int));
   ADC_mutex = xSemaphoreCreateMutex();
+
+  Filter_init(&filter, SAMPLES_SIZE, WINDOW_SIZE, samples, samples_sorted, 0);
+
 
   Serial.begin(115200);
   pinMode(MOTOR_PIN, OUTPUT);
@@ -82,8 +106,22 @@ uint16_t filteredSpeed(uint16_t VIN_brut) {
     samples[index] = VIN_brut;
     index = (index + 1)%SPEED_FILTER_SIZE;
     sum += VIN_brut;
-    
-    return sum/SPEED_FILTER_SIZE;
+
+    if(VIN_brut>>4 != feedBack_speed>>4)
+      cnt++;
+    feedBack_speed = VIN_brut;
+
+    if(feedBack_speed_1>>4 != (sum/SPEED_FILTER_SIZE)>>4)
+      cnt1++;
+    feedBack_speed_1 = sum/SPEED_FILTER_SIZE;
+
+    Filter_push(&filter, VIN_brut);
+    if(feedBack_speed_2>>4 != ((uint16_t)Filter_getTrimedFilteredMean(&filter))>>4)
+      cnt2++;
+    feedBack_speed_2 = Filter_getTrimedFilteredMean(&filter); 
+
+    return feedBack_speed_2;
+    //return sum/SPEED_FILTER_SIZE;
 }
 
 uint16_t filteredTemp(uint16_t VIN_brut){
@@ -132,7 +170,6 @@ void getUserSpeed_Task(void *pvParameters) {
     
     //no signal safety
     if(speed > NO_SIGNAL_SPEED) {
-      feedBack_speed = speed;
       xQueueOverwrite(speedQueue, &speed);
     }
 
@@ -241,11 +278,32 @@ void commandSpeed_Task(void *pvParameters) {
 
 void feedBack_Task(void *pvParameters) {
   for (;;) {
-    Serial.print("Temperature = ");
-    Serial.print(feedBack_temperature);
-    Serial.println(" °C");
-    Serial.print("Vitesse : ");
-    Serial.println(feedBack_speed);
+    //Serial.print("Temperature = ");
+    //Serial.print(feedBack_temperature);
+    //Serial.println(" °C");
+
+    if(feedBack_speed >= feedBack_speed_1)
+      cnt1_bis+= feedBack_speed - feedBack_speed_1;
+    else
+      cnt1_bis+= feedBack_speed_1 - feedBack_speed;
+
+    if(feedBack_speed >= feedBack_speed_2)
+      cnt2_bis+= feedBack_speed - feedBack_speed_2;
+    else
+      cnt2_bis+= feedBack_speed_2 - feedBack_speed;
+
+
+    Serial.print(feedBack_speed);
+    Serial.print(", ");
+    Serial.print(feedBack_speed_1);
+    Serial.print(", ");
+    Serial.print(feedBack_speed_2);
+    Serial.print(", ");
+    Serial.print(cnt);
+    Serial.print(", ");
+    Serial.print(cnt1);
+    Serial.print(", ");
+    Serial.println(cnt2);
     // Synchronisation de l'accès au LCD
     if (feedBack_speed < 85){
       lcd.setCursor(2, 0);
