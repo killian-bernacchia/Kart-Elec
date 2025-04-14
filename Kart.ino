@@ -1,6 +1,9 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
+#include "lcd.h"
+
+////// filter
 #include "filter.h"
 
 #define SAMPLES_SIZE 7
@@ -9,6 +12,7 @@
 uint16_t samples[SAMPLES_SIZE];
 uint16_t samples_sorted[SAMPLES_SIZE];
 Filter filter_speed;
+////// filter end
 
 #define MOTOR_PIN 25
 #define PEDAL_PIN 34
@@ -45,7 +49,7 @@ TaskHandle_t getUserSpeed_TaskHandle;
 TaskHandle_t commandSpeed_TaskHandle;
 TaskHandle_t feedBack_TaskHandle;
 
-LiquidCrystal_I2C lcd(0x27, 20, 4);
+Lcd lcd(0x27, 20, 4);
 
 void setup() {
 
@@ -62,7 +66,6 @@ void setup() {
   dacWrite(MOTOR_PIN, SLEEP_SPEED);     //repos = 0? ou 800mv? // 62 = environ 800mV
 
   //------------Init Lcd-----------/
-  lcd.init();
   lcd.init();
   lcd.backlight();
   lcd.setCursor(6, 0);
@@ -149,7 +152,7 @@ void getTemp_Task(void *pvParameters) {
     voltage = filteredTemp(VIN);
     voltage = voltage * 3.3 / 4095.0;
 
-    //no signal and division by zero safety
+    //safety for no signal and division by zero
     if(voltage > NO_SIGNAL_TEMP_VOLTAGE)
     {
       R2 = 4700.0 * ((3.3 / voltage) - 1);
@@ -157,6 +160,10 @@ void getTemp_Task(void *pvParameters) {
       temperatureC = temperatureK - 273.15;
       feedBack_temperature = temperatureC;
       xQueueOverwrite(tempQueue, &temperatureC);
+    }
+    else
+    {
+      feedBack_temperature = -1;
     }
     vTaskDelay(10 / portTICK_PERIOD_MS);
   }
@@ -235,23 +242,34 @@ void commandSpeed_Task(void *pvParameters) {
 }
 
 void feedBack_Task(void *pvParameters) {
+  int reset_count = 0;
+
   for (;;) {
-    Serial.print("Temperature = ");
+    Serial.print("t:");
     Serial.print(feedBack_temperature);
-    Serial.println(" °C");
-    Serial.print("Speed = ");
+    Serial.print(" s:");
     Serial.println(feedBack_speed);
 
-    // Synchronisation de l'accès au LCD
-    if (feedBack_speed < 85){
-      lcd.setCursor(2, 0);
-      lcd.print("TEMP : ");
+    // Blockage si le kart accélère dû aux interférences
+    if (feedBack_speed < 85) {
+      //reset périodique
+      if (reset_count-- <= 0) {
+        reset_count = 10;
+        lcd.clear();
+      }
+
+      lcd.setCursor(0, 0);
+      float ratio = (feedBack_temperature-50.0f)/(100-50);
+      lcd.printBar(ratio);
+      lcd.print("t:");
       lcd.print(feedBack_temperature);
-      lcd.print(" 'C");
+      //"°C  "
+      lcd.print("\xdf\x43  ");
     }
     vTaskDelay(500 / portTICK_PERIOD_MS);
   }
 }
+
 
 void loop() {
   // put your main code here, to run repeatedly:
