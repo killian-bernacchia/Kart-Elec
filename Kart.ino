@@ -1,10 +1,10 @@
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
 
 #include "lcd.h"
-
-////// filter
 #include "filter.h"
+#include "system_data.h"
+
+volatile System_Data system_data;
 
 #define SAMPLES_SIZE 7
 #define WINDOW_SIZE 3
@@ -20,11 +20,12 @@ Filter filter_speed;
 
 #define NO_SIGNAL_TEMP_VOLTAGE 0.0067f // ~-20°C
 
-#define MAX_SPEED_COUNT 10 //number of time the speed can be unchanged before the motor is stopped
-#define MAX_TEMP_COUNT 250 //number of time the temperature can be unchanged before the motor is stopped
+#define MAX_SPEED_COUNT 30 //number of time the speed can be unchanged before the motor is stopped
+#define MAX_TEMP_COUNT 300 //number of time the temperature can be unchanged before the motor is stopped
 #define NO_SIGNAL_SPEED 35 // inferior speeds are seen as 'no signals'
 #define SLEEP_SPEED 62 // speed when the motor is stopped
 #define SPEED_FILTER_SIZE 9
+#define USER_SPEED_CORRECTOR 1.4f
 
 #define START_SAFE_TEMP 80
 #define END_SAFE_TEMP 118
@@ -36,8 +37,10 @@ Filter filter_speed;
 #endif
 
 
-static QueueHandle_t speedQueue;
+//static QueueHandle_t speedQueue;
 static QueueHandle_t tempQueue;
+
+
 
 volatile uint16_t feedBack_speed;    // writed by getTemp_Task, readed by feedBack_Task
 volatile int feedBack_temperature;  // writed by getTemp_Task, readed by feedBack_Task
@@ -53,16 +56,19 @@ Lcd lcd(0x27, 20, 4);
 
 void setup() {
 
-  speedQueue = xQueueCreate(1, sizeof(uint8_t));
+  //speedQueue = xQueueCreate(1, sizeof(uint8_t));
   tempQueue = xQueueCreate(1, sizeof(int));
   ADC_mutex = xSemaphoreCreateMutex();
 
   Filter_init(&filter_speed, SAMPLES_SIZE, WINDOW_SIZE, samples, samples_sorted, 0);
 
+  SystemDataInitSemaphores();
+
   Serial.begin(115200);
   pinMode(MOTOR_PIN, OUTPUT);
   pinMode(PEDAL_PIN, INPUT);
   pinMode(TEMP_PIN, INPUT);
+
   dacWrite(MOTOR_PIN, SLEEP_SPEED);     //repos = 0? ou 800mv? // 62 = environ 800mV
 
   //------------Init Lcd-----------/
@@ -107,31 +113,39 @@ uint16_t filteredTemp(uint16_t VIN_brut){
 }
 
 void getUserSpeed_Task(void *pvParameters) {
-  int VIN;
-  uint8_t speed;
+  uint16_t VIN, filtered_VIN;
+  uint16_t speed;
+
   for (;;) {
     xSemaphoreTake(ADC_mutex, portMAX_DELAY);
     VIN = analogRead(PEDAL_PIN);
     xSemaphoreGive(ADC_mutex);
-    VIN = filteredSpeed(VIN);
+    filtered_VIN = filteredSpeed(VIN);
 
     //overflow safety
-    if( ((7*VIN)/5)>>4 <= 255) {
-      speed = ((7*VIN)/5)>>4; //1.4*(VIN>>4); facteur correcteur + 12bits -> bits
+    if( ((7*filtered_VIN)/5)>>4 <= 255) {
+      speed = ((7*filtered_VIN)/5)>>4; //1.4*(filtered_VIN>>4); facteur correcteur + 12bits -> bits
     }
     else {
       speed = 255;
     }
 
-    //underflow safety
-    if(speed > NO_SIGNAL_SPEED && speed < SLEEP_SPEED) {
+    if(speed <= NO_SIGNAL_SPEED)
+    {
+      //todo
+    }
+
+    if(speed < SLEEP_SPEED) {
       speed = SLEEP_SPEED;
     }
     
-    //no signal safety
-    if(speed > NO_SIGNAL_SPEED) {
-      xQueueOverwrite(speedQueue, &speed);
-    }
+    xSemaphoreTake(system_data.speed_command_input.mutex, portMAX_DELAY);      
+    system_data.speed_command_input.adc.raw = VIN;
+    system_data.speed_command_input.adc.filtered = filtered_VIN;
+    system_data.speed_command_input.ratio = (float)speed / 255.0f;
+    xSemaphoreGive(system_data.speed_command_input.mutex);
+    xSemaphoreGive(system_data.speed_command_input.sync);
+
     feedBack_speed = speed;
 
     vTaskDelay(1 / portTICK_PERIOD_MS);
@@ -170,40 +184,39 @@ void getTemp_Task(void *pvParameters) {
 }
 
 void commandSpeed_Task(void *pvParameters) {
-  uint8_t speed;
-  uint8_t last_speed;
+  float speed_command_input_ratio;
+  uint16_t speed_in;
+  float speed_coef;
+  uint16_t speed;
   int speed_count = 0;
 
   int temperature;
   int last_temperature;
   int temp_count = 0;
 
-  //wait for the first speed and temperature value
-  while(xQueuePeek(speedQueue, &speed, portMAX_DELAY) == pdFALSE) {
-    vTaskDelay(1);
-  }
-  while(xQueuePeek(tempQueue, &temperature, portMAX_DELAY) == pdFALSE) {
-    vTaskDelay(1);
-  }
+  vTaskDelay(2500 / portTICK_PERIOD_MS);
 
   for (;;) {
     //wait a few ticks for new speed, else use last one
-    if(xQueueReceive(speedQueue, &speed, 0) == pdTRUE) {
-      last_speed = speed;
+    if(xSemaphoreTake(system_data.speed_command_input.sync, 0) == pdTRUE) {
+      xSemaphoreTake(system_data.speed_command_input.mutex, portMAX_DELAY); 
+      speed_command_input_ratio = system_data.speed_command_input.ratio;
+      xSemaphoreGive(system_data.speed_command_input.mutex);
       speed_count = 0;
     }
     else {
-      speed = last_speed;
       speed_count++;
     }
 
+    speed_in = speed = speed_command_input_ratio*255.0f;
+    speed_coef = (speed_command_input_ratio*(speed_command_input_ratio + 1.0f)/2.0f);
+    speed = speed_coef*255.0f;
+
     //wait a few ticks for new temperature, else use last one
     if(xQueueReceive(tempQueue, &temperature, 0) == pdTRUE) {
-      last_temperature = temperature;
       temp_count = 0;
     }
     else {
-      temperature = last_temperature;
       temp_count++;
     }
     
@@ -211,12 +224,14 @@ void commandSpeed_Task(void *pvParameters) {
     if(speed_count > MAX_SPEED_COUNT) {
       speed = SLEEP_SPEED;
       dacWrite(MOTOR_PIN, speed);
+      Serial.println("\n\n>>>MAX_SPEED_COUNT<<<\n");
       vTaskDelay(5000 / portTICK_PERIOD_MS);
       continue;
     } 
     else if(temp_count > MAX_TEMP_COUNT) {
       speed = SLEEP_SPEED;
       dacWrite(MOTOR_PIN, speed);
+      Serial.println("\n\n>>>MAX_TEMP_COUNT<<<\n");
       vTaskDelay(2500 / portTICK_PERIOD_MS);
       continue;
     }
@@ -224,7 +239,10 @@ void commandSpeed_Task(void *pvParameters) {
     //temperature safety
     if(temperature >= START_SAFE_TEMP) {
       if(temperature < END_SAFE_TEMP) {
-        speed = (speed - SLEEP_SPEED)*(END_SAFE_TEMP-temperature)/(END_SAFE_TEMP-START_SAFE_TEMP) + SLEEP_SPEED;
+        float coef = (END_SAFE_TEMP-(float)temperature)/(END_SAFE_TEMP-START_SAFE_TEMP);
+        speed_coef*=coef;
+        speed=speed_coef*255.0f;
+        //speed = (speed - SLEEP_SPEED)*(END_SAFE_TEMP-temperature)/(END_SAFE_TEMP-START_SAFE_TEMP) + SLEEP_SPEED;
       }
       else if(temperature < OVERHEAT_TEMP) {
         speed = SLEEP_SPEED;
@@ -237,21 +255,55 @@ void commandSpeed_Task(void *pvParameters) {
     //send speed to the motor
     dacWrite(MOTOR_PIN, speed);
 
+    xSemaphoreTake(system_data.speed_command_output.mutex, portMAX_DELAY);      
+    system_data.speed_command_output.adc.raw = speed_in;
+    system_data.speed_command_output.adc.filtered = speed;
+    system_data.speed_command_output.ratio = (float)speed / 255.0f;
+    xSemaphoreGive(system_data.speed_command_output.mutex);
+    xSemaphoreTake(system_data.speed_command_input.sync, portMAX_DELAY);
+
     vTaskDelay(1 / portTICK_PERIOD_MS);
   }
 }
 
 void feedBack_Task(void *pvParameters) {
   int reset_count = 0;
+  uint16_t speed_in_raw, speed_in_filtered;
+  float speed_in_ratio;
+
+  uint16_t speed_out_raw;
+  float speed_out_ratio;
+
+  uint16_t VOUT;
 
   for (;;) {
+    xSemaphoreTake(system_data.speed_command_input.mutex, portMAX_DELAY);
+    speed_in_raw = system_data.speed_command_input.adc.raw;
+    speed_in_filtered = system_data.speed_command_input.adc.filtered;
+    speed_in_ratio = system_data.speed_command_input.ratio;
+    xSemaphoreGive(system_data.speed_command_input.mutex);
+
+    xSemaphoreTake(system_data.speed_command_output.mutex, portMAX_DELAY);
+    speed_out_raw = system_data.speed_command_output.adc.raw;
+    speed_out_ratio = system_data.speed_command_output.ratio;
+    xSemaphoreGive(system_data.speed_command_output.mutex);
+
     Serial.print("t:");
     Serial.print(feedBack_temperature);
     Serial.print(" s:");
-    Serial.println(feedBack_speed);
+    Serial.print(speed_in_raw>>4);
+    Serial.print("->");
+    Serial.print(speed_in_filtered>>4);
+    Serial.print("->");
+    Serial.print(speed_in_ratio);
+    Serial.print(" => ");
+
+    Serial.print(speed_out_raw);
+    Serial.print("->");
+    Serial.println(speed_out_ratio);
 
     // Blockage si le kart accélère dû aux interférences
-    if (feedBack_speed < 85) {
+    if (speed_out_ratio < 0.3f) {
       //reset périodique
       if (reset_count-- <= 0) {
         reset_count = 10;
@@ -259,8 +311,8 @@ void feedBack_Task(void *pvParameters) {
       }
 
       lcd.setCursor(0, 0);
-      float ratio = (feedBack_temperature-50.0f)/(100-50);
-      lcd.printBar(ratio);
+      float heat_ratio = (feedBack_temperature-50.0f)/(100-50);
+      lcd.printBar(heat_ratio);
       lcd.print("t:");
       lcd.print(feedBack_temperature);
       //"°C  "
@@ -269,7 +321,6 @@ void feedBack_Task(void *pvParameters) {
     vTaskDelay(500 / portTICK_PERIOD_MS);
   }
 }
-
 
 void loop() {
   // put your main code here, to run repeatedly:
